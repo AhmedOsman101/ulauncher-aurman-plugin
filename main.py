@@ -20,7 +20,7 @@ class Extension(Extension):
 class KeywordQueryEventListener(EventListener):
     packageManager = "sudo pacman"
 
-    def command_exists(cmd: str) -> bool:
+    def command_exists(self, cmd: str) -> bool:
         return shutil.which(cmd) is not None
 
     def on_event(self, event, extension):
