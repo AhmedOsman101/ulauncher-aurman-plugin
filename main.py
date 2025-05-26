@@ -5,52 +5,64 @@ from ulauncher.api.shared.item.ExtensionResultItem import ExtensionResultItem
 from ulauncher.api.shared.action.RenderResultListAction import RenderResultListAction
 from ulauncher.api.shared.action.HideWindowAction import HideWindowAction
 from ulauncher.api.shared.action.CopyToClipboardAction import CopyToClipboardAction
-import requests
 import subprocess
-import os
+import shutil
 
-#Proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
+# Proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
 
 
 class Extension(Extension):
-
     def __init__(self):
         super(Extension, self).__init__()
         self.subscribe(KeywordQueryEvent, KeywordQueryEventListener())
 
 
 class KeywordQueryEventListener(EventListener):
+    packageManager = "sudo pacman"
+
+    def command_exists(cmd: str) -> bool:
+        return shutil.which(cmd) is not None
+
     def on_event(self, event, extension):
         query = event.get_argument() or str()
         if len(query.strip()) == 0:
-            return RenderResultListAction([
-                ExtensionResultItem(icon='icon.png',
-                                    name='No input',
-                                    on_enter=HideWindowAction())
-            ])
+            return RenderResultListAction(
+                [
+                    ExtensionResultItem(
+                        icon="icon.png", name="No input", on_enter=HideWindowAction()
+                    )
+                ]
+            )
         else:
-            data = subprocess.Popen(["paru", "-Ss", str(query)], stdout = subprocess.PIPE)
+            if self.command_exists("paru"):
+                self.packageManager = "paru"
+            elif self.command_exists("yay"):
+                self.packageManager = "yay"
+
+            data = subprocess.Popen(
+                [self.packageManager, "-Ss", str(query)], stdout=subprocess.PIPE
+            )
             cmd = str(data.communicate())
 
-            packages = [] # List of packages
-            pkg_num = 0 # Number of packages
-            i = 3 # Character index
+            packages = []  # List of packages
+            pkg_num = 0  # Number of packages
+            i = 3  # Character index
             while i < len(cmd) and len(packages) <= 20:
                 packages.append([])
                 repo = ""
                 name = ""
                 description = ""
-                while i < len(cmd) and cmd[i] != '/':
+                while i < len(cmd) and cmd[i] != "/":
                     repo += cmd[i]
                     i += 1
                 i += 1
-                while i < len(cmd) and cmd[i] != ' ':
+                while i < len(cmd) and cmd[i] != " ":
                     name += cmd[i]
                     i += 1
-                while i < len(cmd) and cmd[i] != '\\':
+                while i < len(cmd) and cmd[i] != "\\":
                     i += 1
                 i += 6
-                while i < len(cmd) and cmd[i] != '\\':
+                while i < len(cmd) and cmd[i] != "\\":
                     description += cmd[i]
                     i += 1
                 packages[pkg_num].append(name)
@@ -64,18 +76,30 @@ class KeywordQueryEventListener(EventListener):
             items = []
             for q in packages:
                 if q[2] == "aur":
-                    items.append(ExtensionResultItem(icon='icon.png',
-                                                     name=q[0] + "  (" + q[2] + ")",
-                                                     description=q[1],
-                                                     on_enter=CopyToClipboardAction("paru -S " + q[0])))
+                    items.append(
+                        ExtensionResultItem(
+                            icon="icon.png",
+                            name=q[0] + "  (" + q[2] + ")",
+                            description=q[1],
+                            on_enter=CopyToClipboardAction(
+                                f"{self.packageManager} -S " + q[0]
+                            ),
+                        )
+                    )
                 else:
-                    items.append(ExtensionResultItem(icon='icon.png',
-                                                     name=q[0] + "  (" + q[2] + ")",
-                                                     description=q[1],
-                                                     on_enter=CopyToClipboardAction("sudo pacman -S " + q[0])))
+                    items.append(
+                        ExtensionResultItem(
+                            icon="icon.png",
+                            name=q[0] + "  (" + q[2] + ")",
+                            description=q[1],
+                            on_enter=CopyToClipboardAction(
+                                f"{self.packageManager} -S " + q[0]
+                            ),
+                        )
+                    )
 
             return RenderResultListAction(items)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     Extension().run()
